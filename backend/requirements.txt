@@ -1,0 +1,28 @@
+# Core API
+fastapi
+uvicorn[standard]
+
+# Database  (pre-built wheel — asyncpg 0.30.0 added Python 3.13 support)
+asyncpg
+sqlalchemy
+pgvector
+PyMuPDF
+
+# Caching
+redis
+redis[asyncio]
+python-multipart
+
+# HTTP Client
+httpx
+feedparser
+
+# Configuration
+python-dotenv
+pydantic-settings
+
+# Load testing
+locust
+
+# LLM
+ollama
