@@ -30,7 +30,7 @@ class ArxivClient:
             entries.append(entry_dict)
         return entries
     
-    async def search(self, query : str, max_results : int = 2):
+    async def search(self, query : str, start : int = 0, max_results : int = 2):
         global _last_request_time, _arxiv_lock
 
         if _arxiv_lock is None:
@@ -42,7 +42,7 @@ class ArxivClient:
                 await asyncio.sleep(3 - time_passed)
             _last_request_time = time.monotonic()
 
-        response = await self.client.get(f"http://export.arxiv.org/api/query?search_query=all:{query}&start=0&max_results={max_results}")
+        response = await self.client.get(f"http://export.arxiv.org/api/query?search_query=all:{query}&start={start}&max_results={max_results}")
         if response.status_code != 200:
             print(f"Error: {response.status_code}: {response.text}")
             return []

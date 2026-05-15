@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 import asyncio
 import asyncpg
 from app.db.connection import get_db, get_redis
@@ -33,12 +33,28 @@ async def search(query: str, conn: asyncpg.Connection = Depends(get_db), limit: 
 
 
 @router.get("/cache/search")
-async def search_from_cache(query: str, conn: asyncpg.Connection = Depends(get_db), redis: redis_client.Redis = Depends(get_redis), limit: int = 10):
+async def search_from_cache(query: str, papers: int = None, limit: int = 10, conn: asyncpg.Connection = Depends(get_db), redis: redis_client.Redis = Depends(get_redis), background_tasks: BackgroundTasks):
+    default_limit = 20
+
     try:
+        service = IngestionService(ArxivClient())
         cache_key = f"search:{query.lower().strip()}"
         cached_result = await redis.get(cache_key)
 
-        if cached_result:
+        if papers is not None and papers > default_limit:
+            is_ingesting = await redis.get(f"ingesting:{query}")
+            if not is_ingesting:
+                await redis.set(f"ingesting:{query}", "1", ex=settings.redis_ttl_search)
+                remaining_to_fetch = papers - default_limit
+
+                background_tasks.add_task(
+                    service.ingest_papers,
+                    query,
+                    start=default_limit,
+                    max_results=remaining_to_fetch
+                )
+
+        if cached_result and len(json.loads(cached_result)) >= limit:
             return json.loads(cached_result)
         else:
             results = await asyncio.wait_for(
@@ -46,9 +62,8 @@ async def search_from_cache(query: str, conn: asyncpg.Connection = Depends(get_d
                 timeout=1.0
             )
 
-            if not results:
-                service = IngestionService(ArxivClient())
-                await service.ingest_papers(query)
+            if len(results) < limit:
+                await service.ingest_papers(query, max_results=default_limit)
 
                 results = await asyncio.wait_for(
                     search_papers_fts(conn, query, limit),
