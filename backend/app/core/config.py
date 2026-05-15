@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     )
 
     # Application metadata
-    app_name: str = "Research Paper Intelligence System"
+    app_name: str = "A.R.I.S (Adaptive Research Intelligence System)"
     app_version: str = "1.0.0"
     env: Literal["development", "production", "testing"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"

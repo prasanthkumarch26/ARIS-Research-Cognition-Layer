@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A.X.I.O.M",
-  description: "Reserch Paper Intelligence System",
+  title: "A.R.I.S",
+  description: "Reserch Intelligence System",
 };
 
 export default function RootLayout({

@@ -44,14 +44,13 @@ export default async function Home({
       {/* Header */}
       <div className="flex flex-col items-center text-center mt-4">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold">
-          A<span className="text-red-500">.</span>X
+          A<span className="text-red-500">.</span>R
           <span className="text-red-500">.</span>I
-          <span className="text-red-500">.</span>O
-          <span className="text-red-500">.</span>M
+          <span className="text-red-500">.</span>S
         </h1>
 
         <h2 className="text-xs sm:text-sm md:text-base text-gray-400 mt-2 max-w-md">
-          Adaptive eXplanatory Intelligence for Optimization and Modeling
+          Adaptive Research Intelligence System
         </h2>
 
         <p className="text-xs sm:text-sm text-gray-500 mt-2">

@@ -1,4 +1,4 @@
-# A.X.I.O.M. – Paper Intelligence System
+# A.R.I.S - Adaptive Research Intelligence System
 
 A production-grade asynchronous full-text search and ingestion system for scientific papers (arXiv).  
 Built using a **read-through cache architecture with PostgreSQL GIN-based full-text search**, enabling real-time scientific paper retrieval, indexing, and ranking.
@@ -108,10 +108,10 @@ This design ensures repeated queries are served directly from indexed storage, m
 ## 📸 Interface Preview
 
 ### Desktop View
-![Desktop View](public/desktop-view.png)
+![Desktop View](assests/desktop-view.png)
 
 ### Mobile View
-![Mobile View](public/mobile-view.png)
+![Mobile View](assests/mobile-view.png)
 
 ---
 
@@ -140,7 +140,7 @@ npm run dev
 ```
 
 Frontend runs at:
-axiomresearch.vercel.app
+aris.vercel.app
 
 ---
 
