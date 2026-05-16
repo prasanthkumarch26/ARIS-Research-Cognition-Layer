@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 import asyncio
 import asyncpg
-from app.db.connection import get_db, get_redis
+from app.db.connection import get_db, get_redis, get_db_pool
 from app.db.queries import search_papers_fts
 from app.services.ingestion_service import IngestionService
 from app.services.arxiv_client import ArxivClient
@@ -11,11 +11,14 @@ import redis.asyncio as redis_client
 import json
 
 router = APIRouter()
+service = IngestionService(ArxivClient())
 
 @router.get("/search")
-async def search(query: str, conn: asyncpg.Connection = Depends(get_db), limit: int = 10):
+async def search(query: str, limit: int = 10):
     try:
-        results = await search_papers_fts(conn, query, limit)
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            results = await search_papers_fts(conn, query, limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
@@ -25,19 +28,20 @@ async def search(query: str, conn: asyncpg.Connection = Depends(get_db), limit: 
         service = IngestionService(ArxivClient())
         await service.ingest_papers(query)
         
-        final_results = await search_papers_fts(conn, query, limit)
-        if final_results:
-            return [dict(row) for row in final_results]
-        else:
-            raise HTTPException(status_code=404, detail="Error: No results found")
+        async with pool.acquire() as conn:
+            final_results = await search_papers_fts(conn, query, limit)
+            if final_results:
+                return [dict(row) for row in final_results]
+            else:
+                raise HTTPException(status_code=404, detail="Error: No results found")
 
 
 @router.get("/cache/search")
-async def search_from_cache(query: str, papers: int = None, limit: int = 10, conn: asyncpg.Connection = Depends(get_db), redis: redis_client.Redis = Depends(get_redis), background_tasks: BackgroundTasks):
+async def search_from_cache(background_tasks: BackgroundTasks,query: str, papers: int = None, limit: int = 10, redis: redis_client.Redis = Depends(get_redis)):
     default_limit = 20
 
     try:
-        service = IngestionService(ArxivClient())
+        pool = await get_db_pool()
         cache_key = f"search:{query.lower().strip()}"
         cached_result = await redis.get(cache_key)
 
@@ -54,21 +58,23 @@ async def search_from_cache(query: str, papers: int = None, limit: int = 10, con
                     max_results=remaining_to_fetch
                 )
 
-        if cached_result and len(json.loads(cached_result)) >= limit:
+        if cached_result:
             return json.loads(cached_result)
         else:
-            results = await asyncio.wait_for(
-                search_papers_fts(conn, query, limit),
-                timeout=1.0
-            )
+            async with pool.acquire() as conn:
+                results = await asyncio.wait_for(
+                    search_papers_fts(conn, query, limit),
+                    timeout=5.0
+                )
 
             if len(results) < limit:
                 await service.ingest_papers(query, max_results=default_limit)
 
-                results = await asyncio.wait_for(
-                    search_papers_fts(conn, query, limit),
-                    timeout=1.0
-                )
+                async with pool.acquire() as conn:
+                    results = await asyncio.wait_for(
+                        search_papers_fts(conn, query, limit),
+                        timeout=5.0
+                    )
 
             if results:
                 results_dict = [dict(row) for row in results]

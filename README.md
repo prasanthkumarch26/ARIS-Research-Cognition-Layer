@@ -19,7 +19,7 @@ Built using a **read-through cache architecture with PostgreSQL GIN-based full-t
 ### Stability Under Load
 
 - Sustained performance under **500–600 concurrent users**
-- No cascading failures under 30-minute stress tests
+- No cascading failures under 1hr stress tests
 - Controlled degradation under peak load via cached query reuse
 - Stable throughput under sustained high-concurrency traffic
 

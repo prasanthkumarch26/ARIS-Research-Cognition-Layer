@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Paper Intelligence API",
+    title="ARIS Cognition Layer",
     description="Scalable document ingestion, search, and ranking backend",
     version="1.0.0",
     lifespan=lifespan
