@@ -1,4 +1,4 @@
-# A.R.I.S - Adaptive Research Intelligence System
+# A.R.I.S. - Adaptive Research Intelligence System
 
 A production-grade asynchronous full-text search and ingestion system for scientific papers (arXiv).  
 Built using a **read-through cache architecture with PostgreSQL GIN-based full-text search**, enabling real-time scientific paper retrieval, indexing, and ranking.
