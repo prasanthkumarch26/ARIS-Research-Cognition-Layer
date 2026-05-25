@@ -9,12 +9,11 @@ Built using a **read-through cache architecture with PostgreSQL GIN-based full-t
 
 ### Peak Load: 600 users @ 25 users/sec
 
-- **Throughput:** ~295 RPS (1M+ requests/hour equivalent)
-- **Latency:** P95 ~58ms, P99 ~130ms
-- **Error Rate:** ~0% (13–46 transient failures over 1M+ requests)
+- **Throughput:** ~294 RPS (Over 1,059,000 requests processed)
+- **Latency:** P50 ~11ms, P95 ~64ms
+- **Error Rate:** ~0.83% (Graceful 503 load shedding, 0% DB crashes)
 - **Cache Performance:**
-  - `/cache/search`: P95 ~56ms
-  - `/search`: P95 ~63ms
+  - `/cache/search`: P50 ~10ms, P95 ~64ms
 
 ### Stability Under Load
 
@@ -27,18 +26,16 @@ Built using a **read-through cache architecture with PostgreSQL GIN-based full-t
 
 ## 🧠 System Architecture
 
-A **read-through cache + on-demand ingestion pipeline**:
+A **distributed read-through cache + background hydration pipeline**:
 
-1. User query hits FastAPI backend
-2. System first checks **PostgreSQL GIN full-text search index**
-3. On cache miss:
-   - Async fetch from arXiv API
-   - XML parsing and abstract chunking
-   - Conversion into PostgreSQL `tsvector`
-   - Indexed in real time for future queries
-4. Ranked results returned using PostgreSQL `ts_rank`
-
-This design ensures repeated queries are served directly from indexed storage, minimizing external API dependency.
+1. User query hits FastAPI backend.
+2. System first checks **Redis** for sub-millisecond cached JSON results.
+3. On Redis miss, system checks **PostgreSQL GIN full-text search index**.
+4. On DB miss (or insufficient papers):
+   - **Immediate Hydration:** Synchronously fetches the first 20 papers from arXiv to ensure instant UI rendering.
+   - **Background Hydration:** Hands the remaining requested papers to a FastAPI `BackgroundTask` for silent ingestion.
+   - **Stampede Protection:** Uses a Redis distributed lock (`ingesting:{query}`) to ensure 600 concurrent users don't trigger duplicate background tasks.
+5. Ranked results returned using PostgreSQL `ts_rank` and cached in Redis.
 
 ---
 
@@ -56,15 +53,20 @@ This design ensures repeated queries are served directly from indexed storage, m
 - Deduplication using `DISTINCT ON`
 - Sub-100ms query performance for cached data
 
-### Read-Through Cache Design
-- Cache layer backed by pre-indexed PostgreSQL results
+### Distributed Caching & Stampede Protection
+- Redis caching layer for sub-10ms response optimization
+- Distributed locking (`ingesting:{query}`) prevents Cache Stampedes (Thundering Herd problem)
 - Avoids repeated ingestion for previously queried topics
-- Ensures low-latency repeated query execution
 
-### High-Concurrency Data Layer
-- `asyncpg` connection pooling for high throughput
-- Lock-coordinated ingestion to prevent duplicate writes
-- Safe concurrent query + ingestion handling
+### Asynchronous Background Hydration
+- Hybrid sync/async fetching (first 20 papers sync, remaining async)
+- FastAPI `BackgroundTasks` for non-blocking data ingestion
+- `asyncio.Lock` rate-limiting to comply with arXiv API limits without blocking the event loop
+
+### High-Concurrency Data & Resilience Layer
+- `asyncpg` connection pooling with strict lifecycle management (manual acquire/release to prevent starvation)
+- **Load Shedding Middleware:** Automatically rejects excess traffic (503s) to protect database integrity under extreme load
+- Singleton `httpx.AsyncClient` preventing TCP socket exhaustion under 600+ concurrent connections
 
 ### Frontend Optimization
 - Next.js 15 App Router with React Server Components (RSC)
@@ -77,12 +79,12 @@ This design ensures repeated queries are served directly from indexed storage, m
 
 | Metric | Value |
 |--------|------|
-| Max RPS | ~295 |
-| Total Requests | 1M+ |
-| P95 Latency | ~58ms |
-| P99 Latency | ~130ms |
-| Failure Rate | ~0% |
-| Concurrent Users | 500–600 |
+| Max RPS | ~294 |
+| Total Requests | 1,059,407 |
+| Median Latency (P50) | ~11ms |
+| P95 Latency | ~64ms |
+| Failure Rate | ~0.83% (Load Shedded) |
+| Concurrent Users | 600 |
 
 ---
 
@@ -146,7 +148,7 @@ aris.vercel.app
 
 ## 🔭 Future Improvements
 
-- Redis caching layer for sub-10ms response optimization
-- Background queue system (Celery/RQ) for ingestion decoupling
-- LLM-based summarization of retrieved papers (Ollama integration)
+- Phase 2: PDF Parsing & Text Extraction Pipeline (PyMuPDF)
+- LLM-based summarization and methodology extraction of retrieved papers (Ollama / Qwen integration)
+- Vector Embeddings for semantic search
 - Horizontal scaling with stateless API replicas
