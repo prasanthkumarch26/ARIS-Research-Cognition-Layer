@@ -3,14 +3,13 @@ import re
 import unicodedata
 
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Optional
-from enum import StrEnum
 
 import fitz
 import httpx
 
-from chunker import TextChunker
+from app.services.chunker import TextChunker
+from app.models.paper_models import Section, SectionType, ParsedPaper
 
 
 HEADER_RE = re.compile(
@@ -45,27 +44,7 @@ REFERENCE_SECTION_PATTERNS = [
 ]
 
 
-class SectionType(StrEnum):
-    CONTENT = "content"
-    REFERENCES = "references"
 
-
-@dataclass
-class Section:
-    section_id: str
-    section_order: int
-    section_name: str
-    section_type: SectionType
-    start_page: Optional[int]
-    end_page: Optional[int]
-    content: str
-
-
-@dataclass
-class ParsedPaper:
-    page_count: int
-    body_font_size: Optional[float]
-    sections: list[Section]
 
 
 class PaperParser:
@@ -328,15 +307,15 @@ async def main():
             section.start_page,
             section.end_page
         )
-    # chunker = TextChunker(max_tokens=400)
+    chunker = TextChunker(max_tokens=400)
     
-    # chunks = chunker.chunk_sections(
-    #     paper.sections
-    # )
+    chunks = chunker.chunk_sections(
+        paper.sections
+    )
     
-    # for chunk in chunks[:5]:
-    #     print(chunk)
-    #     print("-" * 100)
+    for chunk in chunks[:5]:
+        print(chunk)
+        print("-" * 100)
 
 
 if __name__ == "__main__":

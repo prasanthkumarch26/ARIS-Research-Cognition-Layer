@@ -1,20 +1,30 @@
 from typing import List
+from app.models.paper_models import Section
 
 
 class TextChunker:
-    def __init__(self, max_tokens: int = 400):
+    def __init__(
+        self,
+        max_tokens: int = 400,
+        overlap_tokens: int = 50,
+    ):
         self.max_tokens = max_tokens
+        self.overlap_tokens = overlap_tokens
 
     def _token_count(self, text: str) -> int:
-        return max(1, len(text) // 4)
+        return max(1, len(text.split()))
 
-    def _find_split_point(
-        self,
-        text: str,
-        mid: int
-    ) -> int:
+    def _find_sentence_split(self, text: str) -> int:
+        mid = len(text) // 2
 
-        sentence_endings = [". ", "! ", "? "]
+        sentence_endings = [
+            ". ",
+            "! ",
+            "? ",
+            ".\n",
+            "!\n",
+            "?\n",
+        ]
 
         best_pos = None
         best_distance = float("inf")
@@ -32,31 +42,24 @@ class TextChunker:
                 mid
             )
 
-            candidates = []
+            for pos in (left, right):
 
-            if left != -1:
-                candidates.append(
-                    left + len(ending)
+                if pos == -1:
+                    continue
+
+                split_pos = pos + len(ending)
+
+                distance = abs(
+                    split_pos - mid
                 )
-
-            if right != -1:
-                candidates.append(
-                    right + len(ending)
-                )
-
-            for pos in candidates:
-                distance = abs(mid - pos)
 
                 if distance < best_distance:
                     best_distance = distance
-                    best_pos = pos
+                    best_pos = split_pos
 
-        if best_pos is not None:
-            return best_pos
+        return best_pos or mid
 
-        return mid
-
-    def _split_large_paragraph(
+    def _split_large_text(
         self,
         text: str
     ) -> List[str]:
@@ -64,12 +67,7 @@ class TextChunker:
         if self._token_count(text) <= self.max_tokens:
             return [text]
 
-        mid = len(text) // 2
-
-        split_point = self._find_split_point(
-            text,
-            mid
-        )
+        split_point = self._find_sentence_split(text)
 
         left = text[:split_point].strip()
         right = text[split_point:].strip()
@@ -78,17 +76,17 @@ class TextChunker:
 
         if left:
             chunks.extend(
-                self._split_large_paragraph(left)
+                self._split_large_text(left)
             )
 
         if right:
             chunks.extend(
-                self._split_large_paragraph(right)
+                self._split_large_text(right)
             )
 
         return chunks
 
-    def _chunk_text(
+    def _chunk_content(
         self,
         text: str
     ) -> List[str]:
@@ -100,8 +98,8 @@ class TextChunker:
         ]
 
         chunks = []
+        current = []
 
-        current_chunk = []
         current_tokens = 0
 
         for paragraph in paragraphs:
@@ -112,16 +110,16 @@ class TextChunker:
 
             if paragraph_tokens > self.max_tokens:
 
-                if current_chunk:
+                if current:
                     chunks.append(
-                        "\n\n".join(current_chunk)
+                        "\n\n".join(current)
                     )
 
-                    current_chunk = []
+                    current = []
                     current_tokens = 0
 
                 chunks.extend(
-                    self._split_large_paragraph(
+                    self._split_large_text(
                         paragraph
                     )
                 )
@@ -133,67 +131,92 @@ class TextChunker:
                 paragraph_tokens
                 <= self.max_tokens
             ):
-                current_chunk.append(paragraph)
+                current.append(paragraph)
                 current_tokens += paragraph_tokens
 
             else:
                 chunks.append(
-                    "\n\n".join(current_chunk)
+                    "\n\n".join(current)
                 )
 
-                current_chunk = [paragraph]
-                current_tokens = paragraph_tokens
+                overlap = []
 
-        if current_chunk:
+                overlap_tokens = 0
+
+                for p in reversed(current):
+
+                    p_tokens = self._token_count(p)
+
+                    if (
+                        overlap_tokens +
+                        p_tokens
+                        > self.overlap_tokens
+                    ):
+                        break
+
+                    overlap.insert(0, p)
+                    overlap_tokens += p_tokens
+
+                current = overlap + [paragraph]
+
+                current_tokens = (
+                    overlap_tokens +
+                    paragraph_tokens
+                )
+
+        if current:
             chunks.append(
-                "\n\n".join(current_chunk)
+                "\n\n".join(current)
             )
 
         return chunks
 
     def chunk_sections(
         self,
-        sections: List[dict]
+        sections: List[Section]
     ) -> List[dict]:
 
         chunks = []
 
         for section in sections:
 
-            text_chunks = self._chunk_text(
-                section["content"]
+            section_chunks = self._chunk_content(
+                section.content
             )
 
-            for idx, chunk in enumerate(text_chunks):
+            for idx, chunk in enumerate(section_chunks):
 
                 chunks.append(
                     {
                         "chunk_id":
-                            f"{section['section_id']}_chunk_{idx:03d}",
+                            f"{section.section_id}_chunk_{idx:03d}",
 
                         "section_id":
-                            section["section_id"],
+                            section.section_id,
 
                         "section_name":
-                            section["section_name"],
+                            section.section_name,
+
+                        "section_type":
+                            section.section_type.value,
 
                         "section_order":
-                            section["section_order"],
+                            section.section_order,
 
                         "chunk_index":
                             idx,
 
                         "start_page":
-                            section["start_page"],
+                            section.start_page,
 
                         "end_page":
-                            section["end_page"],
+                            section.end_page,
 
                         "content":
                             chunk,
 
                         "token_count":
-                            self._token_count(chunk)
+                            self._token_count(chunk),
                     }
                 )
 
