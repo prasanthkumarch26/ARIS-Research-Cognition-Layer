@@ -131,9 +131,6 @@ python app/migrations.py
 uvicorn app.main:app --reload
 ```
 
-Backend runs at:
-http://127.0.0.1:8000
-
 ### 3. Run Frontend
 ```bash
 cd frontend
@@ -142,7 +139,7 @@ npm run dev
 ```
 
 Frontend runs at:
-aris.vercel.app
+http://aris.vercel.app
 
 ---
 
