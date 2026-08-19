@@ -139,7 +139,7 @@ npm run dev
 ```
 
 Frontend runs at:
-https://aris.vercel.app
+[https://aris-research.vercel.app/](https://aris-research.vercel.app/)
 
 ---
 
